@@ -21,11 +21,16 @@
             <div class="panel-head">
                 <div>
                     <h2>创建项目</h2>
-                    <p>默认路径会从本地设置读取，留空的 GitHub Token 会自动回退到环境变量 <code>GITHUB_TOKEN</code>。</p>
+                    <p>默认基础路径、仓库可见性和 GitHub Token 都会从本地设置读取。页面内填写的 Token 会优先于环境变量 <code>GITHUB_TOKEN</code>。</p>
                 </div>
-                {% if environment_token %}
-                <span class="token-badge">已检测到环境变量 Token</span>
-                {% endif %}
+                <div class="radio-row">
+                    {% if local_token %}
+                    <span class="token-badge">已保存本地 Token</span>
+                    {% endif %}
+                    {% if environment_token %}
+                    <span class="token-badge">已检测到环境变量 Token</span>
+                    {% endif %}
+                </div>
             </div>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -96,6 +101,7 @@
                             公开
                         </label>
                     </div>
+                    <small>这个选项也会作为下次打开页面时的默认值。</small>
                 </fieldset>
 
                 <label class="field">
@@ -103,20 +109,21 @@
                     <input
                         type="password"
                         name="github_token"
+                        value="{{ form_data.github_token }}"
                         placeholder="ghp_xxx 或 github_pat_xxx"
                         autocomplete="off"
                     >
-                    <small>推荐使用 Personal Access Token。Classic Token 至少需要 <code>repo</code> 权限。</small>
+                    <small>点击“保存默认设置”后，Token 会保存到本地的 <code>{{ settings_file }}</code>，不会提交到 git。</small>
                 </label>
 
                 <label class="checkbox-row">
-                    <input type="checkbox" name="save_base_path" {% if form_data.save_base_path %}checked{% endif %}>
-                    保存当前基础路径，作为下次默认值
+                    <input type="checkbox" name="save_defaults" {% if form_data.save_defaults %}checked{% endif %}>
+                    创建项目时，也把当前路径、可见性和 Token 保存为下次默认值
                 </label>
 
                 <div class="button-row">
                     <button class="button button-secondary" type="submit" formaction="{{ url_for('save_settings_route') }}" formnovalidate>
-                        仅保存默认路径
+                        保存默认设置
                     </button>
                     <button class="button button-primary" type="submit">
                         一键创建仓库并初始化

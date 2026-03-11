@@ -15,6 +15,11 @@ from flask import Flask, flash, redirect, render_template, request, session, url
 APP_ROOT = Path(__file__).resolve().parent
 DEFAULT_BASE_PATH = Path(r"D:\VSCode")
 SETTINGS_FILE = APP_ROOT / "instance" / "settings.json"
+DEFAULT_SETTINGS = {
+    "base_path": str(DEFAULT_BASE_PATH),
+    "visibility": "private",
+    "github_token": "",
+}
 SAFE_PROJECT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 WINDOWS_RESERVED_NAMES = {
     "CON",
@@ -40,26 +45,46 @@ WINDOWS_RESERVED_NAMES = {
     "LPT8",
     "LPT9",
 }
+VALID_VISIBILITIES = {"private", "public"}
 
 app = Flask(__name__, instance_relative_config=True)
 app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "quickrepo-dev-secret")
 
 
 def load_settings() -> dict[str, str]:
+    settings = DEFAULT_SETTINGS.copy()
     if SETTINGS_FILE.exists():
         try:
-            return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            pass
-    return {"base_path": str(DEFAULT_BASE_PATH)}
+            payload = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            payload = {}
+        if isinstance(payload, dict):
+            for key in settings:
+                value = payload.get(key)
+                if isinstance(value, str):
+                    settings[key] = value
+    if settings["visibility"] not in VALID_VISIBILITIES:
+        settings["visibility"] = DEFAULT_SETTINGS["visibility"]
+    return settings
 
 
-def save_settings(base_path: Path) -> None:
-    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS_FILE.write_text(
-        json.dumps({"base_path": str(base_path)}, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+def save_settings(base_path: Path, visibility: str, github_token: str) -> None:
+    try:
+        SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        SETTINGS_FILE.write_text(
+            json.dumps(
+                {
+                    "base_path": str(base_path),
+                    "visibility": visibility,
+                    "github_token": github_token,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        raise RuntimeError(f"默认设置保存失败：{exc}") from exc
 
 
 def normalize_base_path(raw_path: str) -> Path:
@@ -68,6 +93,13 @@ def normalize_base_path(raw_path: str) -> Path:
     if not base_path.is_absolute():
         raise ValueError(r"目录路径必须是绝对路径，例如 D:\VSCode")
     return base_path.resolve(strict=False)
+
+
+def normalize_visibility(raw_visibility: str) -> str:
+    visibility = (raw_visibility or DEFAULT_SETTINGS["visibility"]).strip().lower()
+    if visibility not in VALID_VISIBILITIES:
+        raise ValueError("仓库可见性只能是 private 或 public。")
+    return visibility
 
 
 def validate_project_name(project_name: str) -> str:
@@ -92,9 +124,10 @@ def render_home(
     settings = load_settings()
     defaults = {
         "project_name": "",
-        "base_path": settings.get("base_path", str(DEFAULT_BASE_PATH)),
-        "visibility": "private",
-        "save_base_path": "on",
+        "base_path": settings["base_path"],
+        "visibility": settings["visibility"],
+        "github_token": settings["github_token"],
+        "save_defaults": "on",
     }
     if form_data:
         defaults.update(form_data)
@@ -104,31 +137,36 @@ def render_home(
             form_data=defaults,
             result=result,
             environment_token=bool(os.environ.get("GITHUB_TOKEN")),
+            local_token=bool(settings["github_token"]),
+            settings_file=str(SETTINGS_FILE),
         ),
         status_code,
     )
 
 
 def ensure_project_folder(base_path: Path, project_name: str) -> Path:
-    if base_path.exists() and not base_path.is_dir():
-        raise RuntimeError("目标基础路径已存在，但不是文件夹。")
+    try:
+        if base_path.exists() and not base_path.is_dir():
+            raise RuntimeError("目标基础路径已存在，但不是文件夹。")
 
-    base_path.mkdir(parents=True, exist_ok=True)
-    project_dir = base_path / project_name
+        base_path.mkdir(parents=True, exist_ok=True)
+        project_dir = base_path / project_name
 
-    if project_dir.exists():
-        if not project_dir.is_dir():
-            raise RuntimeError("目标项目路径已存在，但不是文件夹。")
-        if any(project_dir.iterdir()):
-            raise RuntimeError("目标项目文件夹已存在且非空，请换一个名称或清空目录后再试。")
-    else:
-        project_dir.mkdir(parents=True, exist_ok=True)
+        if project_dir.exists():
+            if not project_dir.is_dir():
+                raise RuntimeError("目标项目路径已存在，但不是文件夹。")
+            if any(project_dir.iterdir()):
+                raise RuntimeError("目标项目文件夹已存在且非空，请换一个名称或清空目录后再试。")
+        else:
+            project_dir.mkdir(parents=True, exist_ok=True)
 
-    readme_path = project_dir / "README.md"
-    if not readme_path.exists():
-        readme_path.write_text(f"# {project_name}\n", encoding="utf-8")
+        readme_path = project_dir / "README.md"
+        if not readme_path.exists():
+            readme_path.write_text(f"# {project_name}\n", encoding="utf-8")
 
-    return project_dir
+        return project_dir
+    except OSError as exc:
+        raise RuntimeError(f"无法创建本地项目目录：{exc}") from exc
 
 
 def run_git_command(args: list[str], cwd: Path) -> None:
@@ -249,17 +287,24 @@ def index():
 @app.post("/save-settings")
 def save_settings_route():
     base_path_raw = request.form.get("base_path", "")
+    visibility_raw = request.form.get("visibility", DEFAULT_SETTINGS["visibility"])
+    github_token = request.form.get("github_token", "").strip()
+    form_data = {
+        "base_path": base_path_raw,
+        "visibility": visibility_raw,
+        "github_token": github_token,
+        "save_defaults": request.form.get("save_defaults", "on"),
+    }
+
     try:
         base_path = normalize_base_path(base_path_raw)
-        save_settings(base_path)
+        visibility = normalize_visibility(visibility_raw)
+        save_settings(base_path, visibility, github_token)
     except (ValueError, RuntimeError) as exc:
         flash(str(exc), "error")
-        return render_home(
-            form_data={"base_path": base_path_raw},
-            status_code=400,
-        )
+        return render_home(form_data=form_data, status_code=400)
 
-    flash(f"默认路径已保存为：{base_path}", "success")
+    flash("默认设置已保存：基础路径、仓库可见性和 GitHub Token。", "success")
     return redirect(url_for("index"))
 
 
@@ -267,15 +312,17 @@ def save_settings_route():
 def create_project():
     project_name_raw = request.form.get("project_name", "")
     base_path_raw = request.form.get("base_path", "")
-    visibility = request.form.get("visibility", "private")
-    save_base_path_flag = request.form.get("save_base_path") == "on"
-    token = request.form.get("github_token", "").strip() or os.environ.get("GITHUB_TOKEN", "").strip()
+    visibility_raw = request.form.get("visibility", DEFAULT_SETTINGS["visibility"])
+    github_token = request.form.get("github_token", "").strip()
+    save_defaults_flag = request.form.get("save_defaults") == "on"
+    token = github_token or os.environ.get("GITHUB_TOKEN", "").strip()
 
     form_data = {
         "project_name": project_name_raw,
         "base_path": base_path_raw,
-        "visibility": visibility,
-        "save_base_path": "on" if save_base_path_flag else "",
+        "visibility": visibility_raw,
+        "github_token": github_token,
+        "save_defaults": "on" if save_defaults_flag else "",
     }
 
     if not token:
@@ -288,6 +335,11 @@ def create_project():
     try:
         project_name = validate_project_name(project_name_raw)
         base_path = normalize_base_path(base_path_raw)
+        visibility = normalize_visibility(visibility_raw)
+
+        if save_defaults_flag:
+            save_settings(base_path, visibility, github_token)
+
         project_dir = ensure_project_folder(base_path, project_name)
         initialize_local_repository(project_dir)
         local_ready = True
@@ -299,9 +351,6 @@ def create_project():
         )
         remote_ready = True
         push_to_remote(project_dir, repository["clone_url"], token)
-
-        if save_base_path_flag:
-            save_settings(base_path)
 
         session["last_result"] = {
             "project_name": project_name,
