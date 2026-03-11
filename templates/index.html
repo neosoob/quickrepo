@@ -4,10 +4,16 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>QuickRepo</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20260311-7') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20260311-8') }}">
 </head>
 <body>
     <main class="page-shell">
+        <header class="page-header">
+            <p class="eyebrow">Project</p>
+            <h1>QuickRepo</h1>
+            <p class="page-copy">一键创建 GitHub 仓库、本地项目目录，并完成 Git 初始化。</p>
+        </header>
+
         <section class="panel form-panel">
             <div class="panel-head">
                 <div>
@@ -114,7 +120,7 @@
                     创建项目时，也把当前路径、可见性和 Token 保存为下次默认值
                 </label>
 
-                <div class="button-row button-row-split">
+                <div class="button-row">
                     <button class="button button-primary" type="submit">
                         一键创建仓库并初始化
                     </button>
