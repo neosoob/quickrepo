@@ -8,140 +8,144 @@
 </head>
 <body>
     <main class="page-shell">
-        <section class="hero">
-            <p class="eyebrow">Flask + GitHub API</p>
-            <h1>一键创建 GitHub 仓库，并完成本地 Git 初始化</h1>
-            <p class="hero-copy">
-                输入一次项目名，后端会用同一个名字创建本地文件夹和 GitHub 仓库，然后自动执行
-                <code>git init</code>、首次提交、绑定远程和推送。
-            </p>
-        </section>
-
-        <section class="panel">
-            <div class="panel-head">
-                <div>
-                    <h2>创建项目</h2>
-                    <p>默认基础路径、仓库可见性和 GitHub Token 都会从本地设置读取。页面内填写的 Token 会优先于环境变量 <code>GITHUB_TOKEN</code>。</p>
-                </div>
-                <div class="radio-row">
-                    {% if local_token %}
-                    <span class="token-badge">已保存本地 Token</span>
-                    {% endif %}
-                    {% if environment_token %}
-                    <span class="token-badge">已检测到环境变量 Token</span>
-                    {% endif %}
-                </div>
-            </div>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <div class="flash-list">
-                        {% for category, message in messages %}
-                        <article class="flash flash-{{ category }}">{{ message }}</article>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
-
-            {% if result %}
-            <article class="result-card">
-                <h3>创建完成</h3>
-                <dl>
+        <div class="layout-grid">
+            <section class="panel form-panel">
+                <div class="panel-head">
                     <div>
-                        <dt>仓库</dt>
-                        <dd>{{ result.full_name }}</dd>
+                        <h2>创建项目</h2>
+                        <p>默认基础路径、仓库可见性和 GitHub Token 都会从本地设置读取。页面内填写的 Token 会优先于环境变量 <code>GITHUB_TOKEN</code>。</p>
                     </div>
-                    <div>
-                        <dt>本地目录</dt>
-                        <dd>{{ result.project_dir }}</dd>
-                    </div>
-                    <div>
-                        <dt>远程地址</dt>
-                        <dd><a href="{{ result.html_url }}" target="_blank" rel="noreferrer">{{ result.remote_url }}</a></dd>
-                    </div>
-                </dl>
-            </article>
-            {% endif %}
-
-            <form class="project-form" method="post" action="{{ url_for('create_project') }}">
-                <label class="field">
-                    <span>项目名称</span>
-                    <input
-                        type="text"
-                        name="project_name"
-                        value="{{ form_data.project_name }}"
-                        placeholder="例如 quickrepo"
-                        pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,99}"
-                        required
-                    >
-                    <small>文件夹名和 GitHub 仓库名会共用这个值。</small>
-                </label>
-
-                <label class="field">
-                    <span>基础路径</span>
-                    <input
-                        type="text"
-                        name="base_path"
-                        value="{{ form_data.base_path }}"
-                        placeholder="D:\VSCode"
-                        required
-                    >
-                    <small>最终会创建为 <code>基础路径\项目名称</code>。</small>
-                </label>
-
-                <fieldset class="field">
-                    <legend>仓库可见性</legend>
                     <div class="radio-row">
-                        <label>
-                            <input type="radio" name="visibility" value="private" {% if form_data.visibility != 'public' %}checked{% endif %}>
-                            私有
-                        </label>
-                        <label>
-                            <input type="radio" name="visibility" value="public" {% if form_data.visibility == 'public' %}checked{% endif %}>
-                            公开
-                        </label>
+                        {% if local_token %}
+                        <span class="token-badge">已保存本地 Token</span>
+                        {% endif %}
+                        {% if environment_token %}
+                        <span class="token-badge">已检测到环境变量 Token</span>
+                        {% endif %}
                     </div>
-                    <small>这个选项也会作为下次打开页面时的默认值。</small>
-                </fieldset>
-
-                <label class="field">
-                    <span>GitHub Token</span>
-                    <input
-                        type="password"
-                        name="github_token"
-                        value="{{ form_data.github_token }}"
-                        placeholder="ghp_xxx 或 github_pat_xxx"
-                        autocomplete="off"
-                    >
-                    <small>点击“保存默认设置”后，Token 会保存到本地的 <code>{{ settings_file }}</code>，不会提交到 git。</small>
-                </label>
-
-                <label class="checkbox-row">
-                    <input type="checkbox" name="save_defaults" {% if form_data.save_defaults %}checked{% endif %}>
-                    创建项目时，也把当前路径、可见性和 Token 保存为下次默认值
-                </label>
-
-                <div class="button-row">
-                    <button class="button button-secondary" type="submit" formaction="{{ url_for('save_settings_route') }}" formnovalidate>
-                        保存默认设置
-                    </button>
-                    <button class="button button-primary" type="submit">
-                        一键创建仓库并初始化
-                    </button>
                 </div>
-            </form>
-        </section>
 
-        <section class="panel panel-muted">
-            <h2>执行内容</h2>
-            <pre><code>echo "# project-name" &gt;&gt; README.md
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-list">
+                            {% for category, message in messages %}
+                            <article class="flash flash-{{ category }}">{{ message }}</article>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                {% if result %}
+                <article class="result-card">
+                    <h3>创建完成</h3>
+                    <dl>
+                        <div>
+                            <dt>仓库</dt>
+                            <dd>{{ result.full_name }}</dd>
+                        </div>
+                        <div>
+                            <dt>本地目录</dt>
+                            <dd>{{ result.project_dir }}</dd>
+                        </div>
+                        <div>
+                            <dt>远程地址</dt>
+                            <dd><a href="{{ result.html_url }}" target="_blank" rel="noreferrer">{{ result.remote_url }}</a></dd>
+                        </div>
+                    </dl>
+                </article>
+                {% endif %}
+
+                <form class="project-form" method="post" action="{{ url_for('create_project') }}">
+                    <label class="field">
+                        <span>项目名称</span>
+                        <input
+                            type="text"
+                            name="project_name"
+                            value="{{ form_data.project_name }}"
+                            placeholder="例如 quickrepo"
+                            pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,99}"
+                            required
+                        >
+                        <small>文件夹名和 GitHub 仓库名会共用这个值。</small>
+                    </label>
+
+                    <label class="field">
+                        <span>基础路径</span>
+                        <input
+                            type="text"
+                            name="base_path"
+                            value="{{ form_data.base_path }}"
+                            placeholder="D:\VSCode"
+                            required
+                        >
+                        <small>最终会创建为 <code>基础路径\项目名称</code>。</small>
+                    </label>
+
+                    <fieldset class="field">
+                        <legend>仓库可见性</legend>
+                        <div class="radio-row">
+                            <label>
+                                <input type="radio" name="visibility" value="private" {% if form_data.visibility != 'public' %}checked{% endif %}>
+                                私有
+                            </label>
+                            <label>
+                                <input type="radio" name="visibility" value="public" {% if form_data.visibility == 'public' %}checked{% endif %}>
+                                公开
+                            </label>
+                        </div>
+                        <small>这个选项也会作为下次打开页面时的默认值。</small>
+                    </fieldset>
+
+                    <label class="field">
+                        <span>GitHub Token</span>
+                        <input
+                            type="password"
+                            name="github_token"
+                            value="{{ form_data.github_token }}"
+                            placeholder="ghp_xxx 或 github_pat_xxx"
+                            autocomplete="off"
+                        >
+                        <small>点击“保存默认设置”后，Token 会保存到本地的 <code>{{ settings_file }}</code>，不会提交到 git。</small>
+                    </label>
+
+                    <label class="checkbox-row">
+                        <input type="checkbox" name="save_defaults" {% if form_data.save_defaults %}checked{% endif %}>
+                        创建项目时，也把当前路径、可见性和 Token 保存为下次默认值
+                    </label>
+
+                    <div class="button-row">
+                        <button class="button button-secondary" type="submit" formaction="{{ url_for('save_settings_route') }}" formnovalidate>
+                            保存默认设置
+                        </button>
+                        <button class="button button-primary" type="submit">
+                            一键创建仓库并初始化
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <aside class="side-column">
+                <section class="panel hero-panel">
+                    <p class="eyebrow">Flask + GitHub API</p>
+                    <h1>一键创建 GitHub 仓库，并完成本地 Git 初始化</h1>
+                    <p class="hero-copy">
+                        输入一次项目名，后端会用同一个名字创建本地文件夹和 GitHub 仓库，然后自动执行
+                        <code>git init</code>、首次提交、绑定远程和推送。
+                    </p>
+                </section>
+
+                <section class="panel panel-muted">
+                    <h2>执行内容</h2>
+                    <pre><code>echo "# project-name" &gt;&gt; README.md
 git init
 git add README.md
 git commit -m "first commit"
 git branch -M main
 git remote add origin https://github.com/your-name/project-name.git
 git push -u origin main</code></pre>
-        </section>
+                </section>
+            </aside>
+        </div>
     </main>
 </body>
 </html>
