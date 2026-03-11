@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>QuickRepo</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20260311-6') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20260311-7') }}">
 </head>
 <body>
     <main class="page-shell">
@@ -58,6 +58,7 @@
                 <label class="field">
                     <span>项目名称</span>
                     <input
+                        id="project-name-input"
                         type="text"
                         name="project_name"
                         value="{{ form_data.project_name }}"
@@ -71,13 +72,14 @@
                 <label class="field">
                     <span>基础路径</span>
                     <input
+                        id="base-path-input"
                         type="text"
                         name="base_path"
                         value="{{ form_data.base_path }}"
                         placeholder="D:\VSCode"
                         required
                     >
-                    <small>最终会创建为 <code>基础路径\项目名称</code>。</small>
+                    <small>最终会创建为 <code id="project-path-preview">{{ form_data.base_path }}\{{ form_data.project_name or '项目名称' }}</code></small>
                 </label>
 
                 <fieldset class="field">
@@ -134,5 +136,27 @@ git remote add origin https://github.com/your-name/project-name.git
 git push -u origin main</code></pre>
         </section>
     </main>
+
+    <script>
+        const basePathInput = document.getElementById('base-path-input');
+        const projectNameInput = document.getElementById('project-name-input');
+        const projectPathPreview = document.getElementById('project-path-preview');
+
+        function updateProjectPathPreview() {
+            const basePath = (basePathInput.value || '').trim().replace(/[\\/]+$/, '');
+            const projectName = (projectNameInput.value || '').trim() || '项目名称';
+
+            if (!basePath) {
+                projectPathPreview.textContent = projectName;
+                return;
+            }
+
+            projectPathPreview.textContent = `${basePath}\\${projectName}`;
+        }
+
+        basePathInput.addEventListener('input', updateProjectPathPreview);
+        projectNameInput.addEventListener('input', updateProjectPathPreview);
+        updateProjectPathPreview();
+    </script>
 </body>
 </html>
